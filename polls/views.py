@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from .models import Question, Choice
 from django.http import Http404
-
+from django.utils import timezone
 
 def index(request):
     latest_question_list = Question.objects.order_by("-pub_date")[:5]
@@ -44,26 +44,48 @@ def vote(request, question_id):
         # user hits the Back button.
         return HttpResponseRedirect(reverse("polls:results", args=(question.id,)))
     
-def addchoice(request, question_id):
+def choice(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
-    try:
-        New_Choice = request.POST["newchoice"]
-        if(not New_Choice):
-            raise KeyError
-    except (KeyError):
-        # Redisplay the question voting form.
-        return render(
-            request,
-            "polls/newchoice.html",
-            {
+    if request.method == 'GET':
+        return render(request, "polls/choice.html", {"question": question})
+    elif request.method == 'POST':
+        user_submitted_choice = request.POST["newchoice"]
+        if not user_submitted_choice:
+            return render(request, "polls/choice.html", {
                 "question": question,
-                "error_message": "You didn't select a choice.",
-            },
-                            )
-    else:
-        New_Choice= Choice(
-                    question=question,
-                                    choice_text=New_Choice
-                                    )
-        New_Choice.save()
+                "error_message": "Please enter a valid choice"
+            })
+
+        new_choice = Choice(
+            question=question,
+            choice_text=user_submitted_choice,
+        )
+        new_choice.save()
         return HttpResponseRedirect(reverse("polls:detail", args=(question.id,)))
+
+def votereset(request, question_id):
+    question = get_object_or_404(Question, pk=question_id)
+
+    for choice in question.choice_set.all():
+        choice.votes = 0
+        choice.save()
+
+    return HttpResponseRedirect(reverse("polls:results", args=(question.id,)))
+
+
+def addquestion(request):
+    if request.method == 'GET':
+        return render(request, "polls/addquestion.html", {})
+    elif request.method == 'POST':
+        user_submitted_question = request.POST["addquestion"]
+        if not user_submitted_question:
+            return render(request, "polls/addquestion.html", {
+                "error_message": "Please enter a valid question"
+            })
+        
+        new_question = Question(
+            question_text=user_submitted_question,
+            pub_date=timezone.now(),
+        )
+        new_question.save()
+    return HttpResponseRedirect(reverse("polls:index",))
